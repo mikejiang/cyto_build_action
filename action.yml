@@ -5,12 +5,12 @@ inputs:
     description: 'R version'
     required: true
     default: 'release'
- http-user-agent: # pass on to actions/checkout
-    description: 'If "default" or "", sets the HTTPUserAgent option to e.g. for R
-    3.6.3 running on macOS Catalina, "R/3.6.3 R (3.6.3 x86_64-apple-darwin17.0
-    x86_64 darwin17.0) on GitHub Actions". Otherwise uses whatever value is
-    set.'
-    default: 'default'
+ # http-user-agent: # pass on to actions/checkout
+ #    description: 'If "default" or "", sets the HTTPUserAgent option to e.g. for R
+ #    3.6.3 running on macOS Catalina, "R/3.6.3 R (3.6.3 x86_64-apple-darwin17.0
+ #    x86_64 darwin17.0) on GitHub Actions". Otherwise uses whatever value is
+ #    set.'
+ #    default: 'default'
 outputs:
   browser_download_url:
     description: "browser_download_url"
@@ -23,7 +23,7 @@ runs:
         uses: r-lib/actions/setup-r@master
         with:
           r-version: ${{ r-ver }}
-          http-user-agent: ${{ http-user-agent }}
+          # http-user-agent: ${{ http-user-agent }}
 
       - uses: r-lib/actions/setup-pandoc@v1
 
