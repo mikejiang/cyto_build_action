@@ -1,0 +1,87 @@
+name: 'cyto build'
+description: 'check and build cyto packages'
+inputs:
+  r-ver:  # id of input
+    description: 'R version'
+    required: true
+    default: 'release'
+ http-user-agent:
+  description: 'If "default" or "", sets the HTTPUserAgent option to e.g. for R
+  3.6.3 running on macOS Catalina, "R/3.6.3 R (3.6.3 x86_64-apple-darwin17.0
+  x86_64 darwin17.0) on GitHub Actions". Otherwise uses whatever value is
+  set.'
+  default: 'default'
+outputs:
+  random-number:
+    description: "Random number"
+    value: ${{ steps.random-number-generator.outputs.random-id }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+      - name: Set up R ${{ r-ver }}
+        uses: r-lib/actions/setup-r@master
+        with:
+          r-version: ${{ r-ver }}
+          http-user-agent: ${{ http-user-agent }}
+
+      - uses: r-lib/actions/setup-pandoc@v1
+
+      - name: Query dependencies
+        run: |
+          install.packages('remotes')
+          saveRDS(remotes::dev_package_deps(dependencies = TRUE), ".github/depends.Rds", version = 2)
+          writeLines(sprintf("R-%i.%i", getRversion()$major, getRversion()$minor), ".github/R-version")
+        shell: Rscript {0}
+
+      - name: Get bioc ver
+        run: echo "bioc_ver=$(Rscript -e 'writeLines(as.character(remotes::bioc_version()))')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Cache R packages
+        if: runner.os != 'Windows'
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/R-version') }}-1-${{ hashFiles('.github/depends.Rds') }}
+          restore-keys: ${{ runner.os }}-${{ hashFiles('.github/R-version') }}-1-
+
+      - name: check bioc ver
+        run: echo $bioc_ver
+        shell: bash
+
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          while read -r cmd
+          do
+            eval sudo $cmd
+          done < <(Rscript -e 'writeLines(remotes::system_requirements("ubuntu", "20.04"))')
+      - name: Install dependencies
+        run: |
+          remotes::install_cran(c("rcmdcheck", "devtools"))
+          remotes::install_github("RGLab/cytoinstaller")
+          cytoinstaller::cyto_install_deps(dependencies = TRUE)
+        shell: Rscript {0}
+
+      - name: build src pkg
+        if: runner.os == 'Linux'
+        run: devtools::build()
+        shell: Rscript {0}
+
+      - name: build bin pkg
+        if: runner.os != 'Linux'
+        run: devtools::build(binary = TRUE)
+        shell: Rscript {0}
+        run: echo "build_time=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Upload Release Asset
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: '../*.${{ suffix }}'
+          file_glob: true
+          tag: bioc_${{ env.bioc_ver}}
+          overwrite: true
+          body: "Latest build: "${{ env.build_time}}
